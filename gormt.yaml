@@ -1,0 +1,5 @@
+driver: sqlite3
+datasource: ./cmd/app.db
+out: ./models
+package: models
+tables: "*"   # or list tables like ["users", "orders"]

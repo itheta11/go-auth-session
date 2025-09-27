@@ -1,0 +1,29 @@
+# Binaries for the current project
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+*.o
+*.a
+
+# Test results
+*.test
+testdata/
+
+# Go module cache
+pkg/
+
+# Dependency management tools
+vendor/
+
+# IDE and OS specific files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
