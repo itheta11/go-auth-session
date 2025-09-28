@@ -1,0 +1,7 @@
+to generate keys follow the below steps
+
+1.# Generate a 2048-bit RSA private key
+openssl genrsa -out private.pem 2048
+
+# Extract the public key
+openssl rsa -in private.pem -pubout -out public.pem

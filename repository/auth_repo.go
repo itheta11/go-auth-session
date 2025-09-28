@@ -3,19 +3,23 @@ package repository
 import (
 	"auth-session/dto"
 	"auth-session/models"
+	"auth-session/utils"
 	"log"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type AuthRepo struct {
-	DB *gorm.DB
+	DB         *gorm.DB
+	JwtManager *utils.JwtManager
 }
 
 func NewAuthRepo(db *gorm.DB) *AuthRepo {
-	return &AuthRepo{DB: db}
+	jwtManager := utils.NewJwtManager()
+	return &AuthRepo{DB: db, JwtManager: jwtManager}
 }
 
 func (repo *AuthRepo) IsLoggedIn() bool {
@@ -70,7 +74,7 @@ func (repo *AuthRepo) GetAllusers() ([]dto.User, error) {
 	return res, result.Error
 }
 
-func (repo *AuthRepo) Login(username string, password string, redirectUrl string, appCode string) error {
+func (repo *AuthRepo) Login(ctx *gin.Context, username string, password string, redirectUrl string, appCode string) error {
 	var user models.User
 	var app models.Application
 
@@ -92,6 +96,30 @@ func (repo *AuthRepo) Login(username string, password string, redirectUrl string
 		return res.Error
 	}
 
-	return nil
+	accessToken, err := repo.JwtManager.CreateAccessToken(user.Username, time.Now())
+	if err != nil {
+		panic(err)
+	}
 
+	refreshToken, err := repo.JwtManager.CreateRefreshToken(user.Username, time.Now())
+	if err != nil {
+		panic(err)
+	}
+	ctx.SetCookie("access_token",
+		accessToken,
+		int(repo.JwtManager.AccessTokenExpiry.Seconds()),
+		"/",
+		"",
+		true,
+		true)
+
+	ctx.SetCookie("refresh_token",
+		refreshToken,
+		int(repo.JwtManager.RefreshTokenExpiry.Seconds()),
+		"/",
+		"",
+		true,
+		true)
+
+	return nil
 }

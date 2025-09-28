@@ -59,7 +59,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	err := c.authRepo.Login(userPayload.Username, userPayload.Password, userPayload.RedirectUrl, userPayload.AppCode)
+	err := c.authRepo.Login(ctx, userPayload.Username, userPayload.Password, userPayload.RedirectUrl, userPayload.AppCode)
 
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
