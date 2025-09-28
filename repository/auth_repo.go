@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -22,8 +23,39 @@ func NewAuthRepo(db *gorm.DB) *AuthRepo {
 	return &AuthRepo{DB: db, JwtManager: jwtManager}
 }
 
-func (repo *AuthRepo) IsLoggedIn() bool {
-	return true
+func (repo *AuthRepo) IsLoggedIn(accessToken string, refreshToken string, loggedIn *dto.LoggedInDto, appCode string) (*dto.LoggedInDto, error) {
+	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return repo.JwtManager.RsaPublicKey, nil
+	})
+
+	if err != nil {
+		return loggedIn, err
+	}
+
+	claims, _ := token.Claims.(jwt.Claims)
+	expTime, _ := claims.GetExpirationTime()
+	timeLeft := expTime.Sub(time.Now())
+	if timeLeft < 0 {
+		return loggedIn, err
+	}
+
+	username, err := claims.GetSubject()
+	if username == "" || err != nil || appCode == "" {
+		return loggedIn, err
+	}
+
+	sessionId, err := repo.GetSessionId(username, appCode, int(timeLeft), refreshToken)
+	if err != nil {
+		return loggedIn, err
+	}
+
+	loggedIn.IsLoggedIn = true
+	loggedIn.SessionId = sessionId
+
+	return loggedIn, nil
 }
 
 func (repo *AuthRepo) SignUp(user *dto.CreateUser) (dto.User, error) {
@@ -74,14 +106,15 @@ func (repo *AuthRepo) GetAllusers() ([]dto.User, error) {
 	return res, result.Error
 }
 
-func (repo *AuthRepo) Login(ctx *gin.Context, username string, password string, redirectUrl string, appCode string) error {
+func (repo *AuthRepo) Login(ctx *gin.Context, username string, password string, redirectUrl string, appCode string) (dto.LoginTokenResponse, error) {
+	var response dto.LoginTokenResponse
 	var user models.User
 	var app models.Application
 
 	res := repo.DB.Find(&user, "username = ?", username)
 
 	if res.Error != nil {
-		return res.Error
+		return response, res.Error
 	}
 
 	check := CheckPasswordHash(user.Password, password)
@@ -93,7 +126,7 @@ func (repo *AuthRepo) Login(ctx *gin.Context, username string, password string, 
 	resApp := repo.DB.Find(&app, "name = ?", appCode)
 
 	if resApp.Error != nil {
-		return res.Error
+		return response, res.Error
 	}
 
 	accessToken, err := repo.JwtManager.CreateAccessToken(user.Username, time.Now())
@@ -120,6 +153,55 @@ func (repo *AuthRepo) Login(ctx *gin.Context, username string, password string, 
 		"",
 		true,
 		true)
+	response.AccessToken = accessToken
+	response.RefreshToken = refreshToken
 
-	return nil
+	return response, nil
+}
+
+func (repo *AuthRepo) GetSessionId(username string, appCode string, expSeconds int, tokenHash string) (string, error) {
+	var user models.User
+	var app models.Application
+
+	res := repo.DB.Find(&user, "username = ?", username)
+
+	if res.Error != nil {
+		return "", res.Error
+	}
+
+	resApp := repo.DB.Find(&app, "name = ?", appCode)
+	if resApp.Error != nil {
+		return "", resApp.Error
+	}
+
+	var session models.UserAppSession
+	resSession := repo.DB.Model(&models.UserAppSession{}).
+		Where("user_id = ?", user.ID).
+		Where("app_id = ?", app.ID).
+		Where("is_Active = ?", true).
+		Where("strftime('%s','now') - strftime('%s', last_accessed_time) <= ?", expSeconds+5).
+		Order("last_accessed_time desc").
+		First(&session)
+
+	if resSession.Error != nil {
+		newSession := models.UserAppSession{
+			ID:               uuid.New(),
+			UserID:           user.ID,
+			AppID:            app.ID,
+			StartTime:        time.Now(),
+			LastAccessedTime: time.Now(),
+			IsActive:         true,
+			TokenHash:        tokenHash,
+		}
+
+		result := repo.DB.Create(&newSession)
+
+		if result.Error != nil {
+			return "", result.Error
+		}
+		return newSession.ID.String(), nil
+	}
+
+	return session.ID.String(), nil
+
 }

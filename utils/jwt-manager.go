@@ -11,8 +11,8 @@ import (
 )
 
 type JwtManager struct {
-	rsaPrivateKey      *rsa.PrivateKey
-	rsaPublicKey       *rsa.PublicKey
+	RsaPrivateKey      *rsa.PrivateKey
+	RsaPublicKey       *rsa.PublicKey
 	AccessTokenExpiry  time.Duration
 	RefreshTokenExpiry time.Duration
 }
@@ -32,10 +32,10 @@ func NewJwtManager() *JwtManager {
 		log.Fatalf("failed to create private key: %v", err)
 	}
 
-	jwtManager.rsaPrivateKey = rsaPrivKey
-	jwtManager.rsaPublicKey = rsaPubKey
-	jwtManager.AccessTokenExpiry = (15 * time.Second) - 1  /// access token expiry in ms slightly less than expiry time
-	jwtManager.RefreshTokenExpiry = (60 * time.Second) - 1 /// referes token expiry in ms
+	jwtManager.RsaPrivateKey = rsaPrivKey
+	jwtManager.RsaPublicKey = rsaPubKey
+	jwtManager.AccessTokenExpiry = (15 * time.Minute) - 1  /// access token expiry in ms slightly less than expiry time
+	jwtManager.RefreshTokenExpiry = (60 * time.Minute) - 1 /// referes token expiry in ms
 	return &jwtManager
 }
 
@@ -62,12 +62,13 @@ func (j *JwtManager) CreateAccessToken(username string, iss time.Time) (string, 
 		"iss": "http://example-xyz.com",
 		"aud": "clients",
 		"iat": iss.Unix(),
+		"nbf": iss.Unix(),
 		"exp": iss.Add(j.AccessTokenExpiry).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = "v1"
 
-	return token.SignedString(j.rsaPrivateKey)
+	return token.SignedString(j.RsaPrivateKey)
 }
 
 func (j *JwtManager) CreateRefreshToken(username string, iss time.Time) (string, error) {
@@ -78,10 +79,11 @@ func (j *JwtManager) CreateRefreshToken(username string, iss time.Time) (string,
 		"iss": "http://example-xyz.com",
 		"aud": "clients",
 		"iat": iss.Unix(),
+		"nbf": iss.Unix(),
 		"exp": iss.Add(j.RefreshTokenExpiry).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = "v1"
 
-	return token.SignedString(j.rsaPrivateKey)
+	return token.SignedString(j.RsaPrivateKey)
 }

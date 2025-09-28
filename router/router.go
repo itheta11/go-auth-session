@@ -16,7 +16,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	ctrl := controller.NewAuthController(repo)
 
 	r.GET("/", func(ctx *gin.Context) { ctx.String(200, "API is running") })
-	r.GET("/isLoggedin", ctrl.IsController)
+	r.POST("/isLoggedin", ctrl.IsLoggedIn)
 	r.POST("/signup", ctrl.SignUp)
 	r.GET("/users", ctrl.GetAllUsers)
 	r.POST("/login", ctrl.Login)

@@ -24,9 +24,14 @@ type Application struct {
 
 // UserAppSession table
 type UserAppSession struct {
-	ID     uuid.UUID `gorm:"primaryKey;type:uuid"`
-	UserID uuid.UUID
-	AppID  uuid.UUID
+	ID               uuid.UUID `gorm:"primaryKey;type:uuid"`
+	UserID           uuid.UUID
+	AppID            uuid.UUID
+	StartTime        time.Time `gorm:"not null"`
+	LastAccessedTime time.Time `gorm:"not null"`
+	EndTime          time.Time
+	IsActive         bool `gorm:"not null"`
+	TokenHash        string
 
 	User        User        `gorm:"foreignKey:UserID;"`
 	Application Application `gorm:"foreignKey:AppID;"`
