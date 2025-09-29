@@ -4,6 +4,7 @@ import (
 	"auth-session/dto"
 	"auth-session/repository"
 	"net/http"
+	"time"
 
 	authUtils "auth-session/utils"
 
@@ -29,6 +30,7 @@ func (c *AuthController) IsLoggedIn(ctx *gin.Context) {
 	// if err != nil || accessToken == "" || er != nil || refreshToken == "" {
 	// 	loggedInUser.IsLoggedIn = false
 	// 	ctx.JSON(401, loggedInUser)
+	//. return
 	// }
 
 	var tempLogedInResponse dto.LoginTokenResponse
@@ -97,4 +99,28 @@ func (c *AuthController) Login(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"access_token": response.AccessToken, "refresh_token": response.RefreshToken})
+}
+
+func (c *AuthController) LogOut(ctx *gin.Context) {
+	var signout dto.SignOut
+	accessToken, err := ctx.Cookie(ACCESS_TOKEN)
+	if err != nil || accessToken == "" {
+		ctx.JSON(403, signout)
+		return
+	}
+
+	sessionId := ctx.Query("sessionId")
+	if sessionId == "" {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Wrong sessionId"})
+		return
+	}
+
+	er := c.authRepo.LoggedOut(sessionId, time.Now())
+	if er != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Failed in updating logout time"})
+		return
+	}
+	signout.IsSignedOut = true
+	signout.Message = "Signed out successfully"
+	ctx.JSON(http.StatusOK, signout)
 }

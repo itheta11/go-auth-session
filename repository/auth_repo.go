@@ -159,6 +159,17 @@ func (repo *AuthRepo) Login(ctx *gin.Context, username string, password string, 
 	return response, nil
 }
 
+func (repo *AuthRepo) LoggedOut(sessionId string, endTime time.Time) error {
+	res := repo.DB.Model(&models.UserAppSession{}).
+		Where("id = ?", sessionId).
+		Update("end_time = ?", endTime.String()).
+		Update("is_active = ?", false)
+	if res.Error != nil {
+		return res.Error
+	}
+	return nil
+}
+
 func (repo *AuthRepo) GetSessionId(username string, appCode string, expSeconds int, tokenHash string) (string, error) {
 	var user models.User
 	var app models.Application
